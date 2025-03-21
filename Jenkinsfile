@@ -2,9 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'rakshtihgt96/your-app'
+        DOCKERHUB_USER = 'rakshithgt96'
+        DOCKERHUB_BACKEND_IMAGE = 'rakshithgt96/reactjs-quiz-backend'
+        DOCKERHUB_FRONTEND_IMAGE = 'rakshithgt96/reactjs-quiz-frontend'
         SONARQUBE_SERVER = 'your-sonarqube-server'
-        K8S_DEPLOYMENT = 'your-kubernetes-deployment.yaml'
+        K8S_MANIFEST_PATH = 'kubernetes-manifest'
     }
 
     stages {
@@ -17,29 +19,49 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'npm install'
-                    sh 'npm run build'
-                    sh 'sonar-scanner -Dsonar.projectKey=your-project-key -Dsonar.sources=src'
+                    sh 'cd backend && npm install && sonar-scanner -Dsonar.projectKey=backend'
+                    sh 'cd quiz-app && npm install && sonar-scanner -Dsonar.projectKey=frontend'
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Backend Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE:latest .'
+                sh '''
+                cd backend
+                docker build -t $DOCKERHUB_BACKEND_IMAGE:latest .
+                '''
+            }
+        }
+
+        stage('Build Frontend Docker Image') {
+            steps {
+                sh '''
+                cd quiz-app
+                docker build -t $DOCKERHUB_FRONTEND_IMAGE:latest .
+                '''
             }
         }
 
         stage('Trivy Security Scan') {
             steps {
-                sh 'trivy image $DOCKER_IMAGE:latest'
+                sh 'trivy image $DOCKERHUB_BACKEND_IMAGE:latest'
+                sh 'trivy image $DOCKERHUB_FRONTEND_IMAGE:latest'
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Push Backend to DockerHub') {
             steps {
                 withDockerRegistry(credentialsId: 'dockerhub-credentials') {
-                    sh 'docker push $DOCKER_IMAGE:latest'
+                    sh 'docker push $DOCKERHUB_BACKEND_IMAGE:latest'
+                }
+            }
+        }
+
+        stage('Push Frontend to DockerHub') {
+            steps {
+                withDockerRegistry(credentialsId: 'dockerhub-credentials') {
+                    sh 'docker push $DOCKERHUB_FRONTEND_IMAGE:latest'
                 }
             }
         }
@@ -47,7 +69,13 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 withKubeConfig(credentialsId: 'k8s-config') {
-                    sh 'kubectl apply -f $K8S_DEPLOYMENT'
+                    sh '''
+                    kubectl apply -f $K8S_MANIFEST_PATH/database.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/secret.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/backend.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/frontend.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/ingress.yaml
+                    '''
                 }
             }
         }
@@ -55,7 +83,7 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline executed successfully!'
+            echo 'Deployment successful!'
         }
         failure {
             echo 'Pipeline failed!'
