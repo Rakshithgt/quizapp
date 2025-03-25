@@ -35,7 +35,6 @@ pipeline {
                     '''
                 }
 
-                // Run SonarQube analysis for the entire project
                 withCredentials([string(credentialsId: 'SonarQube-Token', variable: 'SONARQUBE_TOKEN')]) {
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
@@ -76,23 +75,23 @@ pipeline {
         }
 
         stage('Push Backend to DockerHub') {
-    steps {
-        withDockerRegistry([credentialsId: 'dockerhub', url: 'https://index.docker.io/v1/']) {
-            sh '''
-            docker login -u $DOCKERHUB_USER -p $DOCKER_PASS
-            docker push $DOCKERHUB_BACKEND_IMAGE:latest
-            '''
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
+                    '''
+                }
+            }
         }
-    }
-}
 
-stage('Push Frontend to DockerHub') {
-    steps {
-        withDockerRegistry([credentialsId: 'dockerhub', url: 'https://index.docker.io/v1/']) {
-            sh '''
-            docker login -u $DOCKERHUB_USER -p $DOCKER_PASS
-            docker push $DOCKERHUB_FRONTEND_IMAGE:latest
-            '''
+        stage('Push Frontend to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
+                    '''
                 }
             }
         }
