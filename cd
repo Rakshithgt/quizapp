@@ -1,0 +1,24 @@
+    stage('Deploy to Kubernetes') {
+            steps {
+                withKubeConfig(credentialsId: 'k8s-config') {
+                    sh '''
+                    kubectl apply -f $K8S_MANIFEST_PATH/database.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/secret.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/backend.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/frontend.yaml
+                    kubectl apply -f $K8S_MANIFEST_PATH/ingress.yaml
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment successful!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
