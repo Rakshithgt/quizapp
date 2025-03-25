@@ -27,7 +27,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv('sonar-scanner') {
                     sh '''
                     cd backend && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
                     cd ../quiz-app && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
@@ -35,7 +35,7 @@ pipeline {
                 }
 
                 // Run SonarQube analysis for the entire project
-                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONARQUBE_TOKEN')]) {
+                withCredentials([string(credentialsId: 'SonarQube-Token', variable: 'SONARQUBE_TOKEN')]) {
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
                       -Dsonar.projectKey=quiz-app-CI \
