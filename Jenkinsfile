@@ -19,8 +19,10 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'cd backend && npm install && sonar-scanner -Dsonar.projectKey=backend'
-                    sh 'cd quiz-app && npm install && sonar-scanner -Dsonar.projectKey=frontend'
+                    sh '''
+                    cd backend && npm install && sonar-scanner -Dsonar.projectKey=backend
+                    cd ../quiz-app && npm install && sonar-scanner -Dsonar.projectKey=frontend
+                    '''
                 }
             }
         }
@@ -45,8 +47,10 @@ pipeline {
 
         stage('Trivy Security Scan') {
             steps {
-                sh 'trivy image $DOCKERHUB_BACKEND_IMAGE:latest'
-                sh 'trivy image $DOCKERHUB_FRONTEND_IMAGE:latest'
+                sh '''
+                trivy image $DOCKERHUB_BACKEND_IMAGE:latest
+                trivy image $DOCKERHUB_FRONTEND_IMAGE:latest
+                '''
             }
         }
 
@@ -65,28 +69,5 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                withKubeConfig(credentialsId: 'k8s-config') {
-                    sh '''
-                    kubectl apply -f $K8S_MANIFEST_PATH/database.yaml
-                    kubectl apply -f $K8S_MANIFEST_PATH/secret.yaml
-                    kubectl apply -f $K8S_MANIFEST_PATH/backend.yaml
-                    kubectl apply -f $K8S_MANIFEST_PATH/frontend.yaml
-                    kubectl apply -f $K8S_MANIFEST_PATH/ingress.yaml
-                    '''
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Deployment successful!'
-        }
-        failure {
-            echo 'Pipeline failed!'
-        }
-    }
-}
+    } // Closing the 'stages' block
+} // Closing the 'pipeline' block
