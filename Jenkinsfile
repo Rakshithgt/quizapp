@@ -7,6 +7,7 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = 'rakshithgt96'
+        DOCKER_PASS = 'dockerhub'
         DOCKERHUB_BACKEND_IMAGE = 'rakshithgt96/reactjs-quiz-backend'
         DOCKERHUB_FRONTEND_IMAGE = 'rakshithgt96/reactjs-quiz-frontend'
         SONARQUBE_SERVER = 'http://52.66.195.119:9000'
