@@ -76,7 +76,7 @@ pipeline {
 
         stage('Push Backend to DockerHub') {
             steps {
-                withDockerRegistry(credentialsId: 'dockerhub-credentials') {
+                withDockerRegistry(credentialsId: 'dockerhub') {
                     sh '''
                     docker login -u $DOCKERHUB_USER -p $(cat /run/secrets/dockerhub-password)
                     docker push $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
@@ -87,7 +87,7 @@ pipeline {
 
         stage('Push Frontend to DockerHub') {
             steps {
-                withDockerRegistry(credentialsId: 'dockerhub-credentials') {
+                withDockerRegistry(credentialsId: 'dockerhub') {
                     sh '''
                     docker login -u $DOCKERHUB_USER -p $(cat /run/secrets/dockerhub-password)
                     docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
