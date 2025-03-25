@@ -79,7 +79,7 @@ pipeline {
     steps {
         withDockerRegistry([credentialsId: 'dockerhub', url: 'https://index.docker.io/v1/']) {
             sh '''
-            docker login -u $DOCKERHUB_USER -p $(cat /run/secrets/dockerhub-password)
+            docker login -u $DOCKERHUB_USER -p $DOCKER_PASS
             docker push $DOCKERHUB_BACKEND_IMAGE:latest
             '''
         }
@@ -90,7 +90,7 @@ stage('Push Frontend to DockerHub') {
     steps {
         withDockerRegistry([credentialsId: 'dockerhub', url: 'https://index.docker.io/v1/']) {
             sh '''
-            docker login -u $DOCKERHUB_USER -p $(cat /run/secrets/dockerhub-password)
+            docker login -u $DOCKERHUB_USER -p $DOCKER_PASS
             docker push $DOCKERHUB_FRONTEND_IMAGE:latest
             '''
                 }
