@@ -50,7 +50,7 @@ pipeline {
         stage('Build Backend Docker Image') {
             steps {
                 sh '''
-                cd backend
+                cd reactjs-quiz-app/backend && \
                 docker build -t $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG .
                 '''
             }
@@ -59,7 +59,7 @@ pipeline {
         stage('Build Frontend Docker Image') {
             steps {
                 sh '''
-                cd quiz-app
+                cd reactjs-quiz-app/backend && \
                 docker build -t $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG .
                 '''
             }
