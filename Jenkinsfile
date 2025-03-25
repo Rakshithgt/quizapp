@@ -1,13 +1,21 @@
 pipeline {
     agent any
+    tools {
+        jdk 'jdk17'
+        nodejs 'node16'
+    }
 
     environment {
         DOCKERHUB_USER = 'rakshithgt96'
         DOCKERHUB_BACKEND_IMAGE = 'rakshithgt96/reactjs-quiz-backend'
         DOCKERHUB_FRONTEND_IMAGE = 'rakshithgt96/reactjs-quiz-frontend'
         SONARQUBE_SERVER = 'http://52.66.195.119:9000'
-        SONARQUBE_TOKEN = 'sqp_0eec8fe2acf9e77936e19c81504342c894e459f8'
         K8S_MANIFEST_PATH = 'kubernetes-manifest'
+        SCANNER_HOME = tool 'sonar-scanner'
+        APP_NAME = "quiz-app"
+        RELEASE = "1.0.0"
+        IMAGE_NAME = "${DOCKERHUB_USER}/${APP_NAME}"
+        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
 
     stages {
@@ -21,19 +29,21 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                    cd backend && npm install && sonar-scanner -Dsonar.projectKey=backend
-                    cd ../quiz-app && npm install && sonar-scanner -Dsonar.projectKey=frontend
+                    cd backend && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
+                    cd ../quiz-app && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
                     '''
                 }
-                
+
                 // Run SonarQube analysis for the entire project
-                sh '''
-                sonar-scanner \
-                  -Dsonar.projectKey=qyiz-app-CI \
-                  -Dsonar.sources=. \
-                  -Dsonar.host.url=$SONARQUBE_SERVER \
-                  -Dsonar.login=$SONARQUBE_TOKEN
-                '''
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONARQUBE_TOKEN')]) {
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner \
+                      -Dsonar.projectKey=quiz-app-CI \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=$SONARQUBE_SERVER \
+                      -Dsonar.login=$SONARQUBE_TOKEN
+                    '''
+                }
             }
         }
 
@@ -41,7 +51,7 @@ pipeline {
             steps {
                 sh '''
                 cd backend
-                docker build -t $DOCKERHUB_BACKEND_IMAGE:latest .
+                docker build -t $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG .
                 '''
             }
         }
@@ -50,7 +60,7 @@ pipeline {
             steps {
                 sh '''
                 cd quiz-app
-                docker build -t $DOCKERHUB_FRONTEND_IMAGE:latest .
+                docker build -t $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG .
                 '''
             }
         }
@@ -58,8 +68,8 @@ pipeline {
         stage('Trivy Security Scan') {
             steps {
                 sh '''
-                trivy image $DOCKERHUB_BACKEND_IMAGE:latest
-                trivy image $DOCKERHUB_FRONTEND_IMAGE:latest
+                trivy image --exit-code=1 --severity HIGH,CRITICAL $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
+                trivy image --exit-code=1 --severity HIGH,CRITICAL $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
                 '''
             }
         }
@@ -67,7 +77,10 @@ pipeline {
         stage('Push Backend to DockerHub') {
             steps {
                 withDockerRegistry(credentialsId: 'dockerhub-credentials') {
-                    sh 'docker push $DOCKERHUB_BACKEND_IMAGE:latest'
+                    sh '''
+                    docker login -u $DOCKERHUB_USER -p $(cat /run/secrets/dockerhub-password)
+                    docker push $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
+                    '''
                 }
             }
         }
@@ -75,7 +88,10 @@ pipeline {
         stage('Push Frontend to DockerHub') {
             steps {
                 withDockerRegistry(credentialsId: 'dockerhub-credentials') {
-                    sh 'docker push $DOCKERHUB_FRONTEND_IMAGE:latest'
+                    sh '''
+                    docker login -u $DOCKERHUB_USER -p $(cat /run/secrets/dockerhub-password)
+                    docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
+                    '''
                 }
             }
         }
