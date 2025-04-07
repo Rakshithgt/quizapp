@@ -58,7 +58,7 @@ pipeline {
         stage('Build Backend Docker Image') {
             steps {
                 sh '''
-                cd reactjs-quiz-app/backend && \
+                cd reactjs-quiz-app/backend
                 docker build -t $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG .
                 '''
             }
@@ -67,7 +67,7 @@ pipeline {
         stage('Build Frontend Docker Image') {
             steps {
                 sh '''
-                cd reactjs-quiz-app/backend && \
+                cd reactjs-quiz-app/quiz-app
                 docker build -t $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG .
                 '''
             }
@@ -101,6 +101,33 @@ pipeline {
                     docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
                     '''
                 }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                echo "Deploying to Kubernetes..."
+
+                # Replace IMAGE_TAG placeholder in manifests
+                sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/backend-deployment.yaml
+                sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/frontend-deployment.yaml
+
+                # Apply all manifests
+                kubectl apply -f $K8S_MANIFEST_PATH/
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                echo "Verifying deployment..."
+
+                kubectl get pods -n default
+                kubectl get svc quiz-backend-service -n default
+                kubectl get svc quiz-frontend-service -n default
+                '''
             }
         }
     }
