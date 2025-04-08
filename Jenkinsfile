@@ -30,8 +30,15 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube-Server') {
                     sh '''
-                    cd backend && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
-                    cd ../quiz-app && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
+                    cd backend
+                    npm install
+                    $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
+                    cd ..
+
+                    cd quiz-app
+                    npm install
+                    $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
+                    cd ..
                     '''
                 }
 
@@ -58,8 +65,9 @@ pipeline {
         stage('Build Backend Docker Image') {
             steps {
                 sh '''
-                cd reactjs-quiz-app/backend
+                cd backend
                 docker build -t $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG .
+                cd ..
                 '''
             }
         }
@@ -67,8 +75,9 @@ pipeline {
         stage('Build Frontend Docker Image') {
             steps {
                 sh '''
-                cd reactjs-quiz-app/quiz-app
+                cd quiz-app
                 docker build -t $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG .
+                cd ..
                 '''
             }
         }
