@@ -18,6 +18,13 @@ pipeline {
         IMAGE_NAME = "${DOCKERHUB_USER}/${APP_NAME}"
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
+    stages {
+        stage('clean worksoace') {
+            steps {
+                cleanws()
+            }
+        }
+    }
 
     stages {
         stage('Checkout Code') {
@@ -35,10 +42,10 @@ pipeline {
                     '''
                 }
 
-                withCredentials([string(credentialsId: 'sonarQube-Token', variable: 'SONARQUBE_TOKEN')]) {
+                withCredentials([string(credentialsId: 'sonarQube-token', variable: 'SONARQUBE_TOKEN')]) {
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
-                      -Dsonar.projectKey=quiz-app-CI \
+                      -Dsonar.projectKey=quizapp-ci \
                       -Dsonar.sources=. \
                       -Dsonar.host.url=$SONARQUBE_SERVER \
                       -Dsonar.login=$SONARQUBE_TOKEN
@@ -50,7 +57,7 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube-Token'
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonarQube-token'
                 }
             }
         }
