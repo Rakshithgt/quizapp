@@ -29,17 +29,19 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube-Server') {
-                    sh """
-                    cd backend
-                    npm install
-                    \$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
-                    cd ..
+                    dir('reactjs-quiz-app/backend'){
+                      sh '''
+                      npm install
+                      $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
+                      '''
+                    }
 
-                    cd ../quiz-app
-                    npm install
-                    \$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
-                    cd ..
-                    """
+                     dir ('reactjs-quiz-app/quiz-app'){
+                        sh '''
+                        npm install
+                        $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
+                        '''
+                     }                
                 }
 
                 withCredentials([string(credentialsId: 'sonarQube-token', variable: 'SONARQUBE_TOKEN')]) {
