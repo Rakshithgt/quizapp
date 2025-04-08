@@ -7,10 +7,10 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = 'rakshithgt96'
-        DOCKER_PASS = 'dockerhub'
+        DOCKER_PASS = 'dockercred'
         DOCKERHUB_BACKEND_IMAGE = 'rakshithgt96/reactjs-quiz-backend'
         DOCKERHUB_FRONTEND_IMAGE = 'rakshithgt96/reactjs-quiz-frontend'
-        SONARQUBE_SERVER = 'http://52.66.195.119:9000'
+        SONARQUBE_SERVER = 'http://13.233.148.117:9000'
         K8S_MANIFEST_PATH = 'kubernetes-manifest'
         SCANNER_HOME = tool 'sonar-scanner'
         APP_NAME = "quiz-app"
@@ -35,7 +35,7 @@ pipeline {
                     '''
                 }
 
-                withCredentials([string(credentialsId: 'SonarQube-Token', variable: 'SONARQUBE_TOKEN')]) {
+                withCredentials([string(credentialsId: 'sonarQube-Token', variable: 'SONARQUBE_TOKEN')]) {
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
                       -Dsonar.projectKey=quiz-app-CI \
@@ -84,7 +84,7 @@ pipeline {
 
         stage('Push Backend to DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockercred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     docker push $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
@@ -95,7 +95,7 @@ pipeline {
 
         stage('Push Frontend to DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockercred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
@@ -104,29 +104,29 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh '''
-                echo "Deploying to Kubernetes..."
+        #stage('Deploy to Kubernetes') {
+           # steps {
+            #    sh '''
+             #   echo "Deploying to Kubernetes..."
 
                 # Replace IMAGE_TAG placeholder in manifests
-                sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/backend-deployment.yaml
-                sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/frontend-deployment.yaml
+              #  sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/backend-deployment.yaml
+               # sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/frontend-deployment.yaml
 
                 # Apply all manifests
-                kubectl apply -f $K8S_MANIFEST_PATH/
+               # kubectl apply -f $K8S_MANIFEST_PATH/
                 '''
             }
         }
 
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                echo "Verifying deployment..."
+        # stage('Verify Deployment') {
+         #   steps {
+              #  sh '''
+               # echo "Verifying deployment..."
 
-                kubectl get pods -n default
-                kubectl get svc quiz-backend-service -n default
-                kubectl get svc quiz-frontend-service -n default
+               # kubectl get pods -n default
+               # kubectl get svc quiz-backend-service -n default
+               # kubectl get svc quiz-frontend-service -n default
                 '''
             }
         }
