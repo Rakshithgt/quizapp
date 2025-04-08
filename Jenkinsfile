@@ -29,19 +29,19 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube-Server') {
-                    dir('reactjs-quiz-app/backend'){
-                      sh '''
-                      npm install
-                      $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
-                      '''
+                    dir('reactjs-quiz-app/backend') {
+                        sh '''
+                        npm install
+                        $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
+                        '''
                     }
 
-                     dir ('reactjs-quiz-app/quiz-app'){
+                    dir('reactjs-quiz-app/quiz-app') {
                         sh '''
                         npm install
                         $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
                         '''
-                     }                
+                    }
                 }
 
                 withCredentials([string(credentialsId: 'sonarQube-token', variable: 'SONARQUBE_TOKEN')]) {
@@ -122,6 +122,20 @@ pipeline {
                 kubectl apply -f .
                 '''
             }
+        }
+    }
+
+    post {
+        always {
+            emailext(
+                attachLog: true,
+                subject: "'${currentBuild.result}' - ${env.JOB_NAME}",
+                body: """<p>Project: ${env.JOB_NAME}</p>
+                         <p>Build Number: ${env.BUILD_NUMBER}</p>
+                         <p>URL: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
+                to: 'rakshithgt222@gmail.com',
+                attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+            )
         }
     }
 }
