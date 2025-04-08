@@ -18,15 +18,14 @@ pipeline {
         IMAGE_NAME = "${DOCKERHUB_USER}/${APP_NAME}"
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
+
     stages {
-        stage('clean worksoace') {
+        stage('clean workspace') {
             steps {
                 cleanws()
             }
         }
-    }
 
-    stages {
         stage('Checkout Code') {
             steps {
                 git branch: 'master', url: 'https://github.com/Rakshithgt/quizapp.git'
@@ -108,33 +107,6 @@ pipeline {
                     docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
                     '''
                 }
-            }
-        }
-
-        #stage('Deploy to Kubernetes') {
-           # steps {
-            #    sh '''
-             #   echo "Deploying to Kubernetes..."
-
-                # Replace IMAGE_TAG placeholder in manifests
-              #  sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/backend-deployment.yaml
-               # sed -i "s|IMAGE_TAG|$IMAGE_TAG|g" $K8S_MANIFEST_PATH/frontend-deployment.yaml
-
-                # Apply all manifests
-               # kubectl apply -f $K8S_MANIFEST_PATH/
-                '''
-            }
-        }
-
-        # stage('Verify Deployment') {
-         #   steps {
-              #  sh '''
-               # echo "Verifying deployment..."
-
-               # kubectl get pods -n default
-               # kubectl get svc quiz-backend-service -n default
-               # kubectl get svc quiz-frontend-service -n default
-                '''
             }
         }
     }
