@@ -19,13 +19,6 @@ pipeline {
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
 
-    stages {
-        stage('clean workspace') {
-            steps {
-                cleanws()
-            }
-        }
-
         stage('Checkout Code') {
             steps {
                 git branch: 'master', url: 'https://github.com/Rakshithgt/quizapp.git'
