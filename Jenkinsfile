@@ -19,6 +19,7 @@ pipeline {
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
 
+    stages {
         stage('Checkout Code') {
             steps {
                 git branch: 'master', url: 'https://github.com/Rakshithgt/quizapp.git'
