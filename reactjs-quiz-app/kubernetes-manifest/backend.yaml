@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: rakshithgt96/reactjs-quiz-backend:latest
+        image: rakshithgt96/reactjs-quiz-frontend:1.0.0-11
         ports:
         - containerPort: 3000
         env:
