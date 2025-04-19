@@ -2,7 +2,7 @@ pipeline {
     agent any
     tools {
         jdk 'jdk17'
-        nodejs 'node16'  // Make sure this is at least v16.20.1 to match your package requirements
+        nodejs 'node16'  // v16.20.1 or higher
     }
 
     environment {
@@ -30,7 +30,9 @@ pipeline {
                     steps {
                         dir('reactjs-quiz-app/backend') {
                             sh 'npm install'
-                            sh 'npm audit fix --force || true'  // Fix vulnerabilities if possible
+                            sh 'npm audit fix --force || true'
+                            // Generate coverage data if not already in test stage
+                            sh 'mkdir -p reports && npx jest --coverage --collectCoverageFrom="**/*.js" --coverageReporters=json --coverageDirectory=reports'
                         }
                     }
                 }
@@ -38,21 +40,26 @@ pipeline {
                     steps {
                         dir('reactjs-quiz-app/quiz-app') {
                             sh 'npm install'
-                            sh 'npm audit fix --force || true'  // Fix vulnerabilities if possible
+                            sh 'npm audit fix --force || true'
+                            // Frontend coverage setup
+                            sh 'mkdir -p reports'
                         }
                     }
                 }
             }
         }
 
-        stage('Run Unit Tests') {
+        stage('Run Tests') {
             parallel {
                 stage('Backend Tests') {
                     steps {
                         dir('reactjs-quiz-app/backend') {
                             sh 'npm test'
-                            // Add coverage reporting if needed
-                            sh 'mkdir -p reports && npm run test -- --coverage --outputFile=reports/coverage.json'
+                            // Process coverage data for Sonar
+                            sh '''
+                            mv reports/coverage-final.json reports/coverage.json
+                            npx nyc report --reporter=lcov --report-dir=reports
+                            '''
                         }
                     }
                 }
@@ -60,8 +67,10 @@ pipeline {
                     steps {
                         dir('reactjs-quiz-app/quiz-app') {
                             sh 'npm test'
-                            // Add coverage reporting if needed
-                            sh 'mkdir -p reports && npm run test -- --coverage --outputFile=reports/coverage.json'
+                            // Process frontend coverage
+                            sh '''
+                            mv coverage/lcov.info reports/lcov.info
+                            '''
                         }
                     }
                 }
@@ -75,15 +84,19 @@ pipeline {
                         withCredentials([string(credentialsId: 'sonar-backend-token', variable: 'SONAR_TOKEN')]) {
                             dir('reactjs-quiz-app/backend') {
                                 sh """
-                                ${SCANNER_HOME}/bin/sonar-scanner \
-                                  -Dsonar.projectKey=backend \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.host.url=${SONARQUBE_SERVER} \
-                                  -Dsonar.token=${SONAR_TOKEN} \
-                                  -Dsonar.projectName=backend \
-                                  -Dsonar.projectVersion=${env.BUILD_NUMBER} \
-                                  -Dsonar.javascript.lcov.reportPaths=reports/lcov.info \
-                                  -Dsonar.coverage.exclusions=**/test/**,**/node_modules/**
+                                cat > sonar-project.properties <<EOF
+                                sonar.projectKey=backend
+                                sonar.sources=.
+                                sonar.host.url=${SONARQUBE_SERVER}
+                                sonar.token=${SONAR_TOKEN}
+                                sonar.projectName=backend
+                                sonar.projectVersion=${env.BUILD_NUMBER}
+                                sonar.javascript.lcov.reportPaths=reports/lcov.info
+                                sonar.coverage.exclusions=**/test/**,**/node_modules/**
+                                sonar.tests=.
+                                sonar.test.inclusions=**/*.test.js
+                                EOF
+                                ${SCANNER_HOME}/bin/sonar-scanner
                                 """
                             }
                         }
@@ -94,15 +107,19 @@ pipeline {
                         withCredentials([string(credentialsId: 'sonar-frontend-token', variable: 'SONAR_TOKEN')]) {
                             dir('reactjs-quiz-app/quiz-app') {
                                 sh """
-                                ${SCANNER_HOME}/bin/sonar-scanner \
-                                  -Dsonar.projectKey=frontend \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.host.url=${SONARQUBE_SERVER} \
-                                  -Dsonar.token=${SONAR_TOKEN} \
-                                  -Dsonar.projectName=frontend \
-                                  -Dsonar.projectVersion=${env.BUILD_NUMBER} \
-                                  -Dsonar.javascript.lcov.reportPaths=reports/lcov.info \
-                                  -Dsonar.coverage.exclusions=**/test/**,**/node_modules/**
+                                cat > sonar-project.properties <<EOF
+                                sonar.projectKey=frontend
+                                sonar.sources=src
+                                sonar.host.url=${SONARQUBE_SERVER}
+                                sonar.token=${SONAR_TOKEN}
+                                sonar.projectName=frontend
+                                sonar.projectVersion=${env.BUILD_NUMBER}
+                                sonar.javascript.lcov.reportPaths=reports/lcov.info
+                                sonar.coverage.exclusions=**/test/**,**/node_modules/**
+                                sonar.tests=src
+                                sonar.test.inclusions=**/*.test.{js,jsx,ts,tsx}
+                                EOF
+                                ${SCANNER_HOME}/bin/sonar-scanner
                                 """
                             }
                         }
