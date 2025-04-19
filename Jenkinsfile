@@ -65,35 +65,43 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            parallel {
-                stage('Backend Analysis') {
-                    steps {
-                        dir('reactjs-quiz-app/backend') {
-                            sh """
-                            ${SCANNER_HOME}/bin/sonar-scanner \
-                              -Dsonar.projectKey=backend \
-                              -Dsonar.sources=. \
-                              -Dsonar.host.url=${SONARQUBE_SERVER} \
-                              -Dsonar.login=${BACKEND_SONAR_TOKEN}
-                            """
-                        }
-                    }
-                }
-                stage('Frontend Analysis') {
-                    steps {
-                        dir('reactjs-quiz-app/quiz-app') {
-                            sh """
-                            ${SCANNER_HOME}/bin/sonar-scanner \
-                              -Dsonar.projectKey=frontend \
-                              -Dsonar.sources=. \
-                              -Dsonar.host.url=${SONARQUBE_SERVER} \
-                              -Dsonar.login=${FRONTEND_SONAR_TOKEN}
-                            """
-                        }
+    parallel {
+        stage('Backend Analysis') {
+            steps {
+                withCredentials([string(credentialsId: 'sonar-backend-token', variable: 'SONAR_TOKEN')]) {
+                    dir('reactjs-quiz-app/backend') {
+                        sh """
+                        ${SCANNER_HOME}/bin/sonar-scanner \
+                          -Dsonar.projectKey=backend \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=${SONARQUBE_SERVER} \
+                          -Dsonar.login=${SONAR_TOKEN} \
+                          -Dsonar.projectName=backend \
+                          -Dsonar.projectVersion=${env.BUILD_NUMBER}
+                        """
                     }
                 }
             }
         }
+        stage('Frontend Analysis') {
+            steps {
+                withCredentials([string(credentialsId: 'sonar-frontend-token', variable: 'SONAR_TOKEN')]) {
+                    dir('reactjs-quiz-app/quiz-app') {
+                        sh """
+                        ${SCANNER_HOME}/bin/sonar-scanner \
+                          -Dsonar.projectKey=frontend \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=${SONARQUBE_SERVER} \
+                          -Dsonar.login=${SONAR_TOKEN} \
+                          -Dsonar.projectName=frontend \
+                          -Dsonar.projectVersion=${env.BUILD_NUMBER}
+                        """
+                    }
+                }
+            }
+        }
+    }
+}
 
         stage('Backend Quality Gate') {
             steps {
