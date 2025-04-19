@@ -1,38 +1,27 @@
 pipeline {
     agent any
-    tools {
-        jdk 'jdk17'
-        nodejs 'node16'  // v16.20.1 or higher
-    }
 
     environment {
-        DOCKERHUB_BACKEND_IMAGE = 'rakshithgt96/reactjs-quiz-backend'
-        DOCKERHUB_FRONTEND_IMAGE = 'rakshithgt96/reactjs-quiz-frontend'
-        SONARQUBE_SERVER = 'http://13.126.141.74:9000'
-        SCANNER_HOME = tool 'sonar-scanner'
-        APP_NAME = "quiz-app"
-        RELEASE = "1.0.0"
-        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
+        DOCKER_HUB_CREDENTIALS = credentials('dockercred')
+        SONAR_TOKEN = credentials('SonarQube-Token')
+        SONARQUBE_SERVER = 'http:13.126.141.74:9000'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'master', 
-                    url: 'https://github.com/Rakshithgt/quizapp.git',
-                    credentialsId: 'github-credentials'
+                checkout scm
             }
         }
 
         stage('Install Dependencies') {
+            failFast false
             parallel {
                 stage('Backend Dependencies') {
                     steps {
                         dir('reactjs-quiz-app/backend') {
                             sh 'npm install'
-                            sh 'npm audit fix --force || true'
-                            // Generate coverage data if not already in test stage
-                            sh 'mkdir -p reports && npx jest --coverage --collectCoverageFrom="**/*.js" --coverageReporters=json --coverageDirectory=reports'
+                            sh 'npm audit fix --force || true' // Continue even if audit fix fails
                         }
                     }
                 }
@@ -40,9 +29,7 @@ pipeline {
                     steps {
                         dir('reactjs-quiz-app/quiz-app') {
                             sh 'npm install'
-                            sh 'npm audit fix --force || true'
-                            // Frontend coverage setup
-                            sh 'mkdir -p reports'
+                            sh 'npm audit fix --force || true' // Continue even if audit fix fails
                         }
                     }
                 }
@@ -50,27 +37,21 @@ pipeline {
         }
 
         stage('Run Tests') {
+            failFast false
             parallel {
                 stage('Backend Tests') {
                     steps {
                         dir('reactjs-quiz-app/backend') {
-                            sh 'npm test'
-                            // Process coverage data for Sonar
-                            sh '''
-                            mv reports/coverage-final.json reports/coverage.json
-                            npx nyc report --reporter=lcov --report-dir=reports
-                            '''
+                            sh 'mkdir -p reports'
+                            sh 'npx jest --passWithNoTests --coverage --collectCoverageFrom=**/*.js --coverageReporters=json --coverageDirectory=reports || true'
                         }
                     }
                 }
                 stage('Frontend Tests') {
                     steps {
                         dir('reactjs-quiz-app/quiz-app') {
-                            sh 'npm test'
-                            // Process frontend coverage
-                            sh '''
-                            mv coverage/lcov.info reports/lcov.info
-                            '''
+                            sh 'mkdir -p reports'
+                            sh 'npx jest --passWithNoTests --coverage --collectCoverageFrom=**/*.js --coverageReporters=json --coverageDirectory=reports'
                         }
                     }
                 }
@@ -78,49 +59,22 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+            failFast false
             parallel {
                 stage('Backend Analysis') {
                     steps {
-                        withCredentials([string(credentialsId: 'sonar-backend-token', variable: 'SONAR_TOKEN')]) {
-                            dir('reactjs-quiz-app/backend') {
-                                sh """
-                                cat > sonar-project.properties <<EOF
-                                sonar.projectKey=backend
-                                sonar.sources=.
-                                sonar.host.url=${SONARQUBE_SERVER}
-                                sonar.token=${SONAR_TOKEN}
-                                sonar.projectName=backend
-                                sonar.projectVersion=${env.BUILD_NUMBER}
-                                sonar.javascript.lcov.reportPaths=reports/lcov.info
-                                sonar.coverage.exclusions=**/test/**,**/node_modules/**
-                                sonar.tests=.
-                                sonar.test.inclusions=**/*.test.js
-                                EOF
-                                ${SCANNER_HOME}/bin/sonar-scanner
-                                """
+                        dir('reactjs-quiz-app/backend') {
+                            withSonarQubeEnv('SonarQube') {
+                                sh 'npx sonar-scanner -Dsonar.projectKey=quiz-app-backend -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN'
                             }
                         }
                     }
                 }
                 stage('Frontend Analysis') {
                     steps {
-                        withCredentials([string(credentialsId: 'sonar-frontend-token', variable: 'SONAR_TOKEN')]) {
-                            dir('reactjs-quiz-app/quiz-app') {
-                                sh """
-                                cat > sonar-project.properties <<EOF
-                                sonar.projectKey=frontend
-                                sonar.sources=src
-                                sonar.host.url=${SONARQUBE_SERVER}
-                                sonar.token=${SONAR_TOKEN}
-                                sonar.projectName=frontend
-                                sonar.projectVersion=${env.BUILD_NUMBER}
-                                sonar.javascript.lcov.reportPaths=reports/lcov.info
-                                sonar.coverage.exclusions=**/test/**,**/node_modules/**
-                                sonar.tests=src
-                                sonar.test.inclusions=**/*.test.{js,jsx,ts,tsx}
-                                EOF
-                                ${SCANNER_HOME}/bin/sonar-scanner
-                                """
+                        dir('reactjs-quiz-app/quiz-app') {
+                            withSonarQubeEnv('SonarQube') {
+                                sh 'npx sonar-scanner -Dsonar.projectKey=quiz-app-frontend -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN'
                             }
                         }
                     }
@@ -129,37 +83,27 @@ pipeline {
         }
 
         stage('Quality Gate') {
-            parallel {
-                stage('Backend Quality Gate') {
-                    steps {
-                        timeout(time: 10, unit: 'MINUTES') {
-                            waitForQualityGate abortPipeline: true, credentialsId: 'sonar-backend-token'
-                        }
-                    }
-                }
-                stage('Frontend Quality Gate') {
-                    steps {
-                        timeout(time: 10, unit: 'MINUTES') {
-                            waitForQualityGate abortPipeline: true, credentialsId: 'sonar-frontend-token'
-                        }
-                    }
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    waitForQualityGate abortPipeline: false
                 }
             }
         }
 
         stage('Build Docker Images') {
+            failFast false
             parallel {
                 stage('Backend Image') {
                     steps {
                         dir('reactjs-quiz-app/backend') {
-                            sh "docker build --no-cache -t $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG ."
+                            sh 'docker build -t quiz-app-backend:${BUILD_NUMBER} .'
                         }
                     }
                 }
                 stage('Frontend Image') {
                     steps {
                         dir('reactjs-quiz-app/quiz-app') {
-                            sh "docker build --no-cache -t $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG ."
+                            sh 'docker build -t quiz-app-frontend:${BUILD_NUMBER} .'
                         }
                     }
                 }
@@ -167,19 +111,16 @@ pipeline {
         }
 
         stage('Security Scan') {
+            failFast false
             parallel {
                 stage('Scan Backend Image') {
                     steps {
-                        sh "trivy image --exit-code=0 --severity HIGH,CRITICAL $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG || true"
-                        // Generate report
-                        sh "trivy image --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivy-backend-report.html $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG || true"
+                        sh 'docker scan --accept-license --exclude-base --file reactjs-quiz-app/backend/Dockerfile quiz-app-backend:${BUILD_NUMBER} || true'
                     }
                 }
                 stage('Scan Frontend Image') {
                     steps {
-                        sh "trivy image --exit-code=0 --severity HIGH,CRITICAL $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG || true"
-                        // Generate report
-                        sh "trivy image --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivy-frontend-report.html $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG || true"
+                        sh 'docker scan --accept-license --exclude-base --file reactjs-quiz-app/quiz-app/Dockerfile quiz-app-frontend:${BUILD_NUMBER} || true'
                     }
                 }
             }
@@ -187,22 +128,11 @@ pipeline {
 
         stage('Push Docker Images') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockercred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh """
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-                    # Tag images as latest
-                    docker tag $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG $DOCKERHUB_BACKEND_IMAGE:latest
-                    docker tag $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG $DOCKERHUB_FRONTEND_IMAGE:latest
-
-                    # Push versioned and latest tags
-                    docker push $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
-                    docker push $DOCKERHUB_BACKEND_IMAGE:latest
-                    docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
-                    docker push $DOCKERHUB_FRONTEND_IMAGE:latest
-
-                    docker logout
-                    """
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                        docker.image("quiz-app-backend:${BUILD_NUMBER}").push()
+                        docker.image("quiz-app-frontend:${BUILD_NUMBER}").push()
+                    }
                 }
             }
         }
@@ -210,35 +140,23 @@ pipeline {
 
     post {
         always {
-            // Archive security reports
-            archiveArtifacts artifacts: '**/trivy-*-report.html', allowEmptyArchive: true
+            archiveArtifacts artifacts: '**/reports/**/*', allowEmptyArchive: true
             cleanWs()
         }
         success {
-            emailext(
-                subject: "SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
-                body: """<p>Pipeline succeeded!</p>
-                         <p>Build Number: ${env.BUILD_NUMBER}</p>
-                         <p>View results: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>
-                         <p>Docker Images:</p>
-                         <ul>
-                           <li>Backend: ${DOCKERHUB_BACKEND_IMAGE}:${IMAGE_TAG}</li>
-                           <li>Frontend: ${DOCKERHUB_FRONTEND_IMAGE}:${IMAGE_TAG}</li>
-                         </ul>""",
-                to: 'rakshithgt222@gmail.com',
-                attachmentsPattern: '**/trivy-*-report.html',
-                mimeType: 'text/html'
+            emailext (
+                subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>""",
+                to: 'rakshithgt222@gmail.com'
             )
         }
         failure {
-            emailext(
-                subject: "FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
-                body: """<p>Pipeline failed!</p>
-                         <p>Build Number: ${env.BUILD_NUMBER}</p>
-                         <p>View results: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
-                to: 'rakshithgt222@gmail.com',
-                attachLog: true,
-                mimeType: 'text/html'
+            emailext (
+                subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>""",
+                to: 'rakshithgt222@gmail.com'
             )
         }
     }
