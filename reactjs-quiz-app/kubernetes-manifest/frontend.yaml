@@ -5,6 +5,8 @@ metadata:
   namespace: quiz
   labels:
     app: frontend
+  annotations:
+    linkerd.io/inject: enabled
 spec:
   replicas: 1
   strategy:
