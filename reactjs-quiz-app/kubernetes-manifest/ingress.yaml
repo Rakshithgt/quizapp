@@ -10,7 +10,7 @@ metadata:
 spec:
   ingressClassName: alb
   rules:
-    - host: quizapp.cloudcorehub.com
+    - host: www.gan2.xyz
       http:
         paths:
           - path: /api/questions
