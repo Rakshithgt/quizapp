@@ -5,6 +5,8 @@ metadata:
   namespace: quiz
   labels:
     app: backend
+  annotations:
+    linkerd.io/inject: enabled
 spec:
   replicas: 1
   strategy:
@@ -19,10 +21,12 @@ spec:
     metadata:
       labels:
         app: backend
+      annotations:
+        linkerd.io/inject: enabled
     spec:
       containers:
       - name: backend
-        image: ogochukwuozotta/backend-api:latest
+        image: rakshithgt96/reactjs-quiz-backend:latest
         ports:
         - containerPort: 3000
         env:
@@ -44,4 +48,3 @@ spec:
   - port: 3000
     protocol: TCP
   type: ClusterIP
-  
