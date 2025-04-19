@@ -29,9 +29,10 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube-Server') {
                     sh '''
-                    cd backend && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
+                    cd reactjs-quiz-app/backend && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=backend
                     cd ../quiz-app && npm install && $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=frontend
                     '''
+
                   }
 
                
