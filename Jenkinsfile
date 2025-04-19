@@ -8,7 +8,7 @@ pipeline {
     environment {
         DOCKERHUB_BACKEND_IMAGE = 'rakshithgt96/reactjs-quiz-backend'
         DOCKERHUB_FRONTEND_IMAGE = 'rakshithgt96/reactjs-quiz-frontend'
-        SONARQUBE_SERVER = 'http://13.126.141.74:9000'  // Updated server URL
+        SONARQUBE_SERVER = 'http://13.126.141.74:9000'
         SCANNER_HOME = tool 'sonar-scanner'
         APP_NAME = "quiz-app"
         RELEASE = "1.0.0"
@@ -21,8 +21,8 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: 'master', 
-                url: 'https://github.com/Rakshithgt/quizapp.git',
-                credentialsId: 'github-credentials'
+                    url: 'https://github.com/Rakshithgt/quizapp.git',
+                    credentialsId: 'github-credentials'
             }
         }
 
@@ -95,14 +95,18 @@ pipeline {
             }
         }
 
-        stage('Quality Gate') {
+        stage('Backend Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
-                    // Wait for both projects to pass quality gate
-                    script {
-                        waitForQualityGate abortPipeline: true, credentialsId: 'sonar-backend-token'
-                        waitForQualityGate abortPipeline: true, credentialsId: 'sonar-frontend-token'
-                    }
+                    waitForQualityGate abortPipeline: true, credentialsId: 'sonar-backend-token'
+                }
+            }
+        }
+
+        stage('Frontend Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true, credentialsId: 'sonar-frontend-token'
                 }
             }
         }
@@ -122,6 +126,29 @@ pipeline {
                             sh "docker build -t $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG ."
                         }
                     }
+                }
+            }
+        }
+
+        stage('Push Docker Images') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockercred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+                        # Tag images as latest
+                        docker tag $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG $DOCKERHUB_BACKEND_IMAGE:latest
+                        docker tag $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG $DOCKERHUB_FRONTEND_IMAGE:latest
+
+                        # Push versioned and latest tags
+                        docker push $DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG
+                        docker push $DOCKERHUB_BACKEND_IMAGE:latest
+
+                        docker push $DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG
+                        docker push $DOCKERHUB_FRONTEND_IMAGE:latest
+
+                        docker logout
+                    """
                 }
             }
         }
@@ -150,13 +177,10 @@ pipeline {
             emailext(
                 subject: "CI SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                 body: """<p>CI Pipeline Successful!</p>
-                         <p>Project: ${env.JOB_NAME}</p>
                          <p>Build Number: ${env.BUILD_NUMBER}</p>
-                         <p>View results: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>
-                         <p>SonarQube Reports:</p>
                          <ul>
-                           <li>Backend: ${SONARQUBE_SERVER}/dashboard?id=backend</li>
-                           <li>Frontend: ${SONARQUBE_SERVER}/dashboard?id=frontend</li>
+                           <li>Backend Image: <code>$DOCKERHUB_BACKEND_IMAGE:$IMAGE_TAG</code></li>
+                           <li>Frontend Image: <code>$DOCKERHUB_FRONTEND_IMAGE:$IMAGE_TAG</code></li>
                          </ul>""",
                 to: 'rakshithgt222@gmail.com',
                 mimeType: 'text/html'
@@ -166,10 +190,8 @@ pipeline {
             emailext(
                 subject: "CI FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                 body: """<p>CI Pipeline Failed!</p>
-                         <p>Project: ${env.JOB_NAME}</p>
                          <p>Build Number: ${env.BUILD_NUMBER}</p>
-                         <p>View results: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>
-                         <p>Check console output for details.</p>""",
+                         <p>Check the console output for errors.</p>""",
                 to: 'rakshithgt222@gmail.com',
                 attachLog: true,
                 mimeType: 'text/html'
