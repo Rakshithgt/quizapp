@@ -24,6 +24,7 @@ spec:
       annotations:
         linkerd.io/inject: enabled
     spec:
+      serviceAccountName: s3-access-sa
       containers:
       - name: backend
         image: rakshithgt96/reactjs-quiz-backend:1.0.0-11
