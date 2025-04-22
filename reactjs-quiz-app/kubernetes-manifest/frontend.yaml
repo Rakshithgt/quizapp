@@ -22,6 +22,7 @@ spec:
       labels:
         app: frontend
     spec:
+      serviceAccountName: s3-access-sa 
       containers:
       - name: frontend
         image: rakshithgt96/reactjs-quiz-frontend:1.0.0-11
